@@ -1,5 +1,6 @@
 <script>
 import Chart from 'chart.js/auto';
+import { shallowRef } from 'vue';
 import { getRelativePosition } from 'chart.js/helpers';
 import CallsModel from '../models/calls.js';
 import { useCallsStore } from '../stores/calls.js';
@@ -43,7 +44,12 @@ export default {
                 const dataX = myChart.scales.x.getValueForPixel(canvasPosition.x);
                 let store = useCallsStore()
                 store.selectCall(dataX)
-            }
+            },
+            hover: {
+                mode: 'x',
+                intersect: false
+            },
+            responsive: false
         }
         let config = {
             type: 'bar',
@@ -52,6 +58,27 @@ export default {
         }
 
         let myChart = new Chart(chart, config)
+        this.chart = shallowRef(myChart)
+    },
+    data() {
+        return {
+            chart: null
+        }
+    },
+    computed: {
+        selectedCall() {
+            const store = useCallsStore()
+            return store.selectedCall
+        }
+    },
+    watch: {
+        selectedCall(val, oldVal) {
+            this.chart.setActiveElements([{
+                datasetIndex: 0,
+                index: val
+            }])
+            this.chart.update();
+        }
     }
 }
 
