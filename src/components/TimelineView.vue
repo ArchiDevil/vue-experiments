@@ -11,12 +11,16 @@ export default {
         },
         tasksCount: {
             type: Number,
-            default: 1000000
+            default: 100000
         },
         colorsCount: {
             type: Number,
             default: 16
-        }
+        },
+        highlightingWidth: {
+            type: Number,
+            default: 3
+        },
     },
     data() {
         return {
@@ -28,10 +32,16 @@ export default {
             moving: false,
             lastOffset: 0,
             showOriginal: false,
+            lastMousePosition: undefined,
         }
     },
     mounted() {
         this.redraw()
+    },
+    watch: {
+        showOriginal() {
+            this.redraw()
+        }
     },
     computed: {
         maxClusterSize() {
@@ -50,16 +60,19 @@ export default {
             const windowStart = toRaw(this.windowStart)
             const scale = toRaw(this.scale)
             const taskHeight = toRaw(this.taskHeight)
-
-            console.log('redraw')
             const c = this.$refs.canvas
             const ctx = c.getContext('2d')
+
             ctx.fillStyle = 'white'
             ctx.clearRect(0, 0, c.width, c.height)
-            ctx.stroke()
 
             const self = this
             const drawTasks = (tasks, startY) => {
+                let strokeX = 0
+                let strokeY = 0
+                let strokeWidth = 0
+                let strokeHeight = 0
+
                 for (let i = 0; i < tasks.length; i++) {
                     const bucket = tasks[i]
                     const startX = (bucket.startTime - windowStart) * scale
@@ -69,9 +82,21 @@ export default {
                         continue
                     }
 
+                    if (self.lastMousePosition?.x > startX && self.lastMousePosition?.x < startX + width) {
+                        strokeX = startX - self.highlightingWidth / 2
+                        strokeY = startY - self.highlightingWidth / 2
+                        strokeWidth = width + self.highlightingWidth
+                        strokeHeight = taskHeight + self.highlightingWidth
+                    }
+
                     ctx.fillStyle = self.colors[i % self.colors.length]
                     ctx.fillRect(startX, startY, width, height)
                 }
+
+                ctx.strokeStyle = 'rgb(0, 165, 0)'
+                ctx.lineWidth = self.highlightingWidth
+                ctx.strokeRect(strokeX, strokeY, strokeWidth, strokeHeight)
+                ctx.stroke()
             }
 
             drawTasks(toRaw(this.bucketedTasks), 5)
@@ -79,7 +104,6 @@ export default {
             if (this.showOriginal) {
                 drawTasks(toRaw(this.tasks), 5 * 2 + taskHeight)
             }
-            ctx.stroke()
         },
         regenerate() {
             this.tasks = Merger.generateTasks(this.tasksCount)
@@ -93,11 +117,15 @@ export default {
             this.lastOffset = ev.offsetX
         },
         mousemove(ev) {
-            if (!this.moving) {
-                return
+            if (this.moving) {
+                this.windowStart += (this.lastOffset - ev.offsetX) * (1 / this.scale)
+                this.lastOffset = ev.offsetX
+            } else {
+                this.lastMousePosition = {
+                    x: ev.offsetX,
+                    y: ev.offsetY
+                }
             }
-            this.windowStart += (this.lastOffset - ev.offsetX) * (1 / this.scale)
-            this.lastOffset = ev.offsetX
             this.redraw()
         },
         mouseup(ev) {
